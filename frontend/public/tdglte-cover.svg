@@ -1,0 +1,27 @@
+<svg width="900" height="1220" viewBox="0 0 900 1220" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="100" y1="80" x2="700" y2="1140" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#120F18"/>
+      <stop offset="0.5" stop-color="#20192C"/>
+      <stop offset="1" stop-color="#090B11"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(460 470) rotate(90) scale(500 550)">
+      <stop stop-color="#C7A767" stop-opacity="0.75"/>
+      <stop offset="0.5" stop-color="#7D5678" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#0E0D12" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="900" height="1220" rx="36" fill="url(#bg)"/>
+  <rect x="72" y="72" width="756" height="1076" rx="24" stroke="#D7B96E" stroke-opacity="0.45" stroke-width="2"/>
+  <circle cx="450" cy="470" r="320" fill="url(#halo)"/>
+  <circle cx="450" cy="470" r="146" stroke="#E4C887" stroke-opacity="0.8" stroke-width="2"/>
+  <path d="M450 266L504 355H396L450 266Z" fill="#E7C980" fill-opacity="0.7"/>
+  <path d="M350 422H550" stroke="#E7C980" stroke-opacity="0.8" stroke-width="2" stroke-dasharray="8 8"/>
+  <path d="M335 540C390 594 428 644 450 706C472 644 510 594 565 540" stroke="#E7C980" stroke-opacity="0.7" stroke-width="2"/>
+  <path d="M420 225C420 202 438 183 461 183C484 183 502 202 502 225V246H420V225Z" fill="#E7C980" fill-opacity="0.7"/>
+  <path d="M404 358H496" stroke="#E7C980" stroke-opacity="0.9" stroke-width="2"/>
+  <text x="450" y="820" text-anchor="middle" fill="#F5F0E7" font-size="62" font-weight="700" font-family="Georgia, serif" letter-spacing="8">TDGLTE</text>
+  <text x="450" y="905" text-anchor="middle" fill="#F5F0E7" font-size="55" font-weight="600" font-family="Georgia, serif" letter-spacing="2">THE DAY GOOD</text>
+  <text x="450" y="975" text-anchor="middle" fill="#F5F0E7" font-size="55" font-weight="600" font-family="Georgia, serif" letter-spacing="2">LOST TO EVIL</text>
+  <text x="450" y="1038" text-anchor="middle" fill="#D7B96E" font-size="22" font-weight="500" letter-spacing="8" font-family="Verdana, sans-serif">MYSTICPENHD</text>
+</svg>
