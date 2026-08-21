@@ -1,0 +1,105 @@
+/* Styles for admin messages panel and modal */
+.messages-panel {
+  padding: 1rem;
+}
+
+.message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  max-height: 60vh;
+  overflow: auto;
+  padding-right: 0.5rem;
+}
+
+.message-item {
+  background: rgba(18, 17, 24, 0.6);
+  border: 1px solid rgba(210, 182, 136, 0.08);
+  border-radius: 0.9rem;
+  padding: 0.6rem;
+}
+
+.message-item.unread {
+  border-color: rgba(245, 215, 140, 0.32);
+  box-shadow: 0 8px 20px rgba(139, 94, 157, 0.06);
+}
+
+.message-item.read {
+  opacity: 0.86;
+}
+
+.message-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 0.2rem;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.message-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.message-preview {
+  color: rgba(245,241,233,0.84);
+  line-height: 1.6;
+  margin: 0.4rem 0 0;
+}
+
+.message-actions-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Modal card overrides for admin message detail */
+.admin-modal .modal-card {
+  width: min(900px, 98%);
+  max-height: 86vh;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(15,12,17,0.98), rgba(28,22,34,0.98));
+  border: 1px solid rgba(210, 182, 136, 0.14);
+  border-radius: 1rem;
+}
+
+.admin-modal .modal-body {
+  max-height: calc(86vh - 140px);
+  overflow-y: auto;
+  padding: 1.2rem 1.6rem 1.8rem;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.6rem;
+  padding: 1rem 1.6rem 1.6rem;
+  border-top: 1px solid rgba(210, 182, 136, 0.06);
+  justify-content: flex-end;
+}
+
+.message-item header strong {
+  display: inline-block;
+  margin-right: 0.5rem;
+}
+
+.message-item h4 {
+  margin: 0.35rem 0 0;
+  color: #f3efe7;
+}
+
+.message-item .muted {
+  color: rgba(245,241,233,0.6);
+  margin-left: 0.4rem;
+  font-size: 0.92rem;
+}
+
+@media (max-width: 840px) {
+  .message-list { max-height: 40vh; }
+  .message-actions-inline .small-button { padding: 0.4rem 0.6rem; }
+}

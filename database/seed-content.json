@@ -1,0 +1,82 @@
+{
+  "siteName": "MysticPenHD",
+  "author": {
+    "name": "Henry D. James",
+    "title": "Author & Creator of MysticPenHD",
+    "tagline": "A storyteller exploring ancient powers, forgotten histories, sacrifice, and the struggle between good and evil.",
+    "bio": "Henry D. James is a Nigerian writer and creative worldbuilder known for THE DAY GOOD LOST TO EVIL (TDGLTE). His stories combine fantasy, action, mystery, ancient powers, and character-driven conflicts, building worlds where forgotten histories and powerful forces shape the lives of those caught between good and evil.",
+    "achievements": [
+        "Creator and founder of MysticPenHD",
+        "Author of THE DAY GOOD LOST TO EVIL (TDGLTE)",
+        "Creator of a growing collection of original fictional worlds and stories"
+    ],
+    "quote": "Every story has a beginning, but some destinies were written long before the first page."
+},
+  "books": [
+    {
+      "slug": "the-day-good-lost-to-evil",
+    "title": "THE DAY GOOD LOST TO EVIL",
+    "shortTitle": "TDGLTE",
+    "subtitle": "An epic fantasy of ancient powers, forgotten history, and a destiny that refuses to remain buried.",
+    "tagline": "Ancient powers. Forgotten history. A destiny that will change everything.",
+    "coverAsset": "/tdglte-cover.svg",
+    "summary": "THE DAY GOOD LOST TO EVIL follows Rick as his journey unfolds across a world shaped by ancient powers, demons, warriors, dragons, and forgotten history. As he encounters forces far beyond ordinary human understanding, Rick is drawn into a conflict whose origins reach deep into the world's past.",
+    "metadata": {
+        "series": "THE DAY GOOD LOST TO EVIL",
+        "volume": "Book I",
+        "genre": "Dark Fantasy, Fantasy / Action / Adventure",
+        "mood": "Epic, mysterious, intense",
+        "themes": [
+            "Good vs Evil",
+            "Destiny",
+            "Sacrifice",
+            "Power",
+            "Friendship",
+            "Ancient History",
+            "Myth, Legends"
+        ],
+        "readingTime": "Chapter-by-chapter",
+        "status": "Ongoing"
+    },
+    "futureTitles": [
+        {
+            "slug": "silent-invasion",
+            "title": "Silent Invasion",
+            "status": "Planned"
+        },
+        {
+            "slug": "dd-and-dd",
+            "title": "DD & DD",
+            "status": "Planned"
+        },
+        {
+            "slug": "a-man-gone-wild",
+            "title": "A Man Gone Wild",
+            "status": "Planned"
+        }
+    ],
+    "lore": [
+      {
+          "title": "The Architects",
+          "body": "The Architects are an ancient order connected to the forgotten history of the world. Their legacy, vows, and unresolved destiny continue to influence events long after their original age."
+      },
+      {
+          "title": "The Arch Dragons",
+          "body": "Arch Dragons are among the ancient and immensely powerful beings connected to the world's deeper history. The Arch Dragons are equals in power, with the exception of Dragoock, the King Arch Dragon."
+      },
+      {
+          "title": "Wyrms",
+          "body": "Wyrms are powerful creatures that exist within the world of TDGLTE and form part of the ancient supernatural forces encountered throughout the story."
+      },
+      {
+          "title": "The Demon Forces",
+          "body": "Demons are a major supernatural force in TDGLTE. Their hierarchy contains powerful individuals such as Moyo, whose strength and allegiance reveal that the conflict extends beyond ordinary battles."
+      },
+      {
+          "title": "Rick",
+          "body": "Rick is the central protagonist of TDGLTE. Curious, intelligent, determined, and adventurous, he is gradually drawn into a much larger conflict as the mysteries surrounding his world begin to unfold."
+      }
+      ]
+    }
+  ]
+}
