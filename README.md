@@ -3,8 +3,8 @@
 This package keeps the existing React design but separates the application into three clear folders:
 
 - `frontend/` — React + Vite UI
-- `backend/` — Express API, admin authentication, messages, uploads and content APIs
-- `database/` — PostgreSQL schema and initial content seed
+- `backend/` — Express API, admin authentication, messages, uploads and MongoDB persistence
+- `database/` — MongoDB configuration/reference files and retained legacy PostgreSQL migration material
 
 ## Local development
 
@@ -19,6 +19,15 @@ npm run dev
 
 Backend defaults to `http://localhost:3001`.
 
+Set these MongoDB variables in `backend/.env`:
+
+```env
+MONGODB_URI=your-mongodb-connection-string
+MONGODB_DB=mysticpenhd
+```
+
+If MongoDB is not configured, the backend falls back to the local JSON persistence files.
+
 ### 2. Frontend
 
 ```bash
@@ -29,10 +38,6 @@ npm run dev
 ```
 
 Frontend defaults to `http://localhost:5173`. During local development, the Vite proxy sends `/api` to port 3001, so `VITE_API_URL` can stay blank.
-
-### 3. PostgreSQL database
-
-Create a PostgreSQL database and run `database/schema.sql`, then set `DATABASE_URL` in `backend/.env`. The backend will also migrate the bundled legacy content into PostgreSQL when the database is initially empty.
 
 ## Production / Vercel
 
@@ -52,10 +57,10 @@ CLIENT_ORIGIN=https://YOUR-FRONTEND-DOMAIN
 SESSION_SECRET=YOUR-LONG-RANDOM-SECRET
 ADMIN_USERNAME=YOUR-ADMIN-USERNAME
 ADMIN_PASSWORD=YOUR-STRONG-PASSWORD
-DATABASE_URL=YOUR-POSTGRES-CONNECTION-STRING
-DB_SSL=true
+MONGODB_URI=YOUR-MONGODB-CONNECTION-STRING
+MONGODB_DB=mysticpenhd
 ```
 
 `CLIENT_ORIGIN` accepts comma-separated origins when more than one frontend hostname is needed.
 
-For production, configure `DATABASE_URL`. Vercel serverless filesystems are not suitable for permanent content/message storage.
+For production, configure MongoDB. Vercel serverless filesystems are not suitable for permanent content/message storage.
