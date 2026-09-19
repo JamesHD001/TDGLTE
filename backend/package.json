@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/local.js",
-    "start": "node src/local.js"
+    "start": "node src/local.js",
+    "migrate:json": "node scripts/migrate-json-to-mongodb.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1110.0",
