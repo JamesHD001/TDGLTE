@@ -1,8 +1,12 @@
 # Database
 
-The application uses PostgreSQL when `DATABASE_URL` is configured.
+The application uses MongoDB for persistence.
 
-- `schema.sql` creates the application tables.
-- `seed-content.json` is the original site content retained as a readable database seed/reference.
+- The backend MongoDB persistence layer is in `backend/src/db.js`.
+- The `content`, `messages`, `chapter_likes`, `chapter_comments`, `comment_likes`, `comment_reports`, `characters`, and `character_likes` collections are created/used by the backend.
+- Required connection settings are `MONGODB_URI` and, optionally, `MONGODB_DB`.
+- `seed-content.json` and `schema.sql` are retained as legacy PostgreSQL/reference material while the expired Render database remains in its recovery window.
 
-The backend's database initializer creates the same schema automatically and migrates the bundled content when the database is empty, so running `schema.sql` manually is optional if the backend database user has schema-creation permission.
+The backend automatically creates the required MongoDB indexes and migrates the bundled local content into the `content` collection when that collection does not yet contain the `site-content` document.
+
+For a free cloud deployment, MongoDB Atlas currently provides a Free cluster with 512 MB of storage. Free clusters do not include managed backups, so keep separate exports of important production data.

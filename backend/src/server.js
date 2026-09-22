@@ -168,7 +168,7 @@ function enforceEngagementRateLimit(request, response, action, maxRequests, wind
   return true;
 }
 
-// Legacy file-based persistence (used when DATABASE_URL is not provided)
+// Local JSON fallback persistence (used only when MongoDB is not configured or unavailable)
 async function ensureDataFile() {
   await fs.mkdir(path.dirname(dataFilePath), { recursive: true });
 
@@ -210,7 +210,7 @@ async function saveContentFile(content) {
   return content;
 }
 
-// Abstraction: choose DB-backed functions when DATABASE_URL is present
+// Abstraction: choose MongoDB-backed functions when MongoDB is configured
 let usingDb = false;
 
 async function loadContent() {
@@ -1511,7 +1511,7 @@ export function initializeApplication() {
         // ignore
       }
 
-      if (process.env.MONGODB_URI || process.env.DATABASE_URL) {
+      if (process.env.MONGODB_URI) {
         try {
           await initDb();
           usingDb = true;
@@ -1523,7 +1523,7 @@ export function initializeApplication() {
         }
       } else {
         usingDb = false;
-        console.log('No DATABASE_URL found — using file-based persistence');
+        console.log('No MONGODB_URI found — using file-based persistence');
       }
     })();
   }
