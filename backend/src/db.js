@@ -102,9 +102,9 @@ export async function initDb() {
 }
 
 export async function getSiteContent() {
-  if (!database) return readLegacyContent();
+  if (!database) return null;
   const content = await database.collection('content').findOne({ key: 'site-content' });
-  return content?.value || readLegacyContent();
+  return content?.value ?? null;
 }
 
 export async function saveContentToDb(content) {
