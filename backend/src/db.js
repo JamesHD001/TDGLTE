@@ -17,6 +17,10 @@ const commentReportsFilePath = path.join(__dirname, 'data', 'comment_reports.jso
 let client = null;
 let database = null;
 
+export function getDatabase() {
+  return database;
+}
+
 function getConnectionString() {
   return process.env.MONGODB_URI || process.env.DATABASE_URL || '';
 }
@@ -58,6 +62,8 @@ async function ensureIndexes() {
     database.collection('characters').createIndex({ publicationState: 1, featured: -1, updatedAt: -1 }),
     database.collection('character_likes').createIndex({ characterId: 1, visitorId: 1 }, { unique: true }),
     database.collection('character_likes').createIndex({ characterId: 1 }),
+    database.collection('sessions').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    database.collection('login_rate_limits').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
   ]);
 }
 
@@ -86,10 +92,7 @@ export async function initDb() {
     serverSelectionTimeoutMS: 5000,
   };
 
-  if (process.env.DB_SSL === 'false' || process.env.MONGODB_TLS_ALLOW_INVALID === 'true') {
-    clientOptions.tlsAllowInvalidCertificates = true;
-  }
-
+  // Never disable TLS certificate validation. Atlas-managed TLS remains enabled by default.
   client = new MongoClient(connectionString, clientOptions);
   await client.connect();
   database = client.db(process.env.MONGODB_DB || undefined);
