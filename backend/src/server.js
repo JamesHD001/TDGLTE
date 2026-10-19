@@ -43,11 +43,48 @@ import {
   addCharacterLikeToDb,
   removeCharacterLikeFromDb,
   slugify,
+  getDatabase,
 } from './db.js';
 import { censorContent } from './censor.js';
 import admin from 'firebase-admin';
 
 dotenv.config();
+
+const isProduction = process.env.NODE_ENV === 'production';
+const configuredMongoUri = process.env.MONGODB_URI || process.env.DATABASE_URL || '';
+const configuredClientOrigins = (process.env.CLIENT_ORIGIN || (isProduction ? '' : 'http://localhost:5173'))
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+if (isProduction) {
+  const configurationErrors = [];
+  if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) {
+    configurationErrors.push('SESSION_SECRET must be set to a random value of at least 32 characters');
+  }
+  if (!process.env.ADMIN_USERNAME || !process.env.ADMIN_PASSWORD) {
+    configurationErrors.push('ADMIN_USERNAME and ADMIN_PASSWORD must be configured');
+  }
+  if (process.env.ADMIN_PASSWORD && process.env.ADMIN_PASSWORD.length < 16) {
+    configurationErrors.push('ADMIN_PASSWORD must be at least 16 characters');
+  }
+  if (!configuredMongoUri.startsWith('mongodb://') && !configuredMongoUri.startsWith('mongodb+srv://')) {
+    configurationErrors.push('MONGODB_URI must be a valid MongoDB connection string');
+  }
+  if (configuredClientOrigins.length === 0 || configuredClientOrigins.some((origin) => {
+    try {
+      const parsed = new URL(origin);
+      return parsed.protocol !== 'https:' || parsed.origin !== origin;
+    } catch {
+      return true;
+    }
+  })) {
+    configurationErrors.push('CLIENT_ORIGIN must contain one or more exact HTTPS origins');
+  }
+  if (configurationErrors.length > 0) {
+    throw new Error(`Invalid production configuration: ${configurationErrors.join('; ')}`);
+  }
+}
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -56,11 +93,8 @@ const __dirname = path.dirname(__filename);
 const dataFilePath = path.join(__dirname, 'data', 'content.json');
 let adminUsername = process.env.ADMIN_USERNAME;
 let adminPassword = process.env.ADMIN_PASSWORD;
-const clientOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-const sessionSecret = process.env.SESSION_SECRET || 'mysticpenhd-development-secret-change-me';
+const clientOrigins = configuredClientOrigins;
+const sessionSecret = process.env.SESSION_SECRET || 'local-development-only-session-secret';
 const awsRegion = process.env.AWS_REGION;
 const awsAccessKeyId = process.env.AWS_ACCESS_KEY_ID;
 const awsSecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
@@ -68,6 +102,20 @@ const s3BucketName = process.env.S3_BUCKET_NAME || process.env.AWS_S3_BUCKET;
 const hasS3Config = Boolean(awsRegion && awsAccessKeyId && awsSecretAccessKey && s3BucketName);
 
 let hasAdminCredentials = Boolean(adminUsername && adminPassword);
+
+if (isProduction) {
+  app.set('trust proxy', 1);
+}
+
+// Baseline security headers. A tailored Content-Security-Policy should be added
+// after confirming all frontend assets and any required third-party sources.
+app.use((_request, response, next) => {
+  response.setHeader('X-Content-Type-Options', 'nosniff');
+  response.setHeader('X-Frame-Options', 'DENY');
+  response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
 
 if (!hasAdminCredentials) {
   console.warn('Admin authentication is not configured. You can set ADMIN_USERNAME and ADMIN_PASSWORD environment variables, or use the development setup endpoint to initialize credentials (not allowed in production).');
@@ -86,9 +134,69 @@ app.use(
   }),
 );
 app.use(express.json({ limit: '2mb' }));
+class MongoSessionStore extends session.Store {
+  async get(sid, callback) {
+    try {
+      const database = getDatabase();
+      if (!database) throw new Error('MongoDB session store is unavailable.');
+      const record = await database.collection('sessions').findOne({
+        _id: sid,
+        expiresAt: { $gt: new Date() },
+      });
+      callback(null, record?.session ?? null);
+    } catch (error) {
+      callback(error);
+    }
+  }
+
+  async set(sid, sessionData, callback = () => {}) {
+    try {
+      const database = getDatabase();
+      if (!database) throw new Error('MongoDB session store is unavailable.');
+      const expiresAt = sessionData.cookie?.expires
+        ? new Date(sessionData.cookie.expires)
+        : new Date(Date.now() + Number(sessionData.cookie?.originalMaxAge || 8 * 60 * 60 * 1000));
+      await database.collection('sessions').updateOne(
+        { _id: sid },
+        { $set: { session: sessionData, expiresAt } },
+        { upsert: true },
+      );
+      callback();
+    } catch (error) {
+      callback(error);
+    }
+  }
+
+  async destroy(sid, callback = () => {}) {
+    try {
+      const database = getDatabase();
+      if (!database) throw new Error('MongoDB session store is unavailable.');
+      await database.collection('sessions').deleteOne({ _id: sid });
+      callback();
+    } catch (error) {
+      callback(error);
+    }
+  }
+
+  async touch(sid, sessionData, callback = () => {}) {
+    try {
+      const database = getDatabase();
+      if (!database) throw new Error('MongoDB session store is unavailable.');
+      const expiresAt = sessionData.cookie?.expires
+        ? new Date(sessionData.cookie.expires)
+        : new Date(Date.now() + Number(sessionData.cookie?.originalMaxAge || 8 * 60 * 60 * 1000));
+      await database.collection('sessions').updateOne({ _id: sid }, { $set: { expiresAt } });
+      callback();
+    } catch (error) {
+      callback(error);
+    }
+  }
+}
+
 app.use(
   session({
     secret: sessionSecret,
+    store: isProduction ? new MongoSessionStore() : undefined,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -134,6 +242,36 @@ function requireAdmin(request, response, next) {
 }
 
 const engagementRateLimits = new Map();
+const localLoginAttempts = new Map();
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 8;
+
+async function consumeLoginAttempt(ipAddress) {
+  const now = Date.now();
+  const normalizedIp = String(ipAddress || 'unknown');
+  const database = getDatabase();
+
+  if (database) {
+    const bucket = Math.floor(now / LOGIN_WINDOW_MS);
+    const hashedIp = crypto.createHash('sha256').update(normalizedIp).digest('hex');
+    const record = await database.collection('login_rate_limits').findOneAndUpdate(
+      { _id: `${hashedIp}:${bucket}` },
+      {
+        $inc: { count: 1 },
+        $setOnInsert: { expiresAt: new Date((bucket + 2) * LOGIN_WINDOW_MS) },
+      },
+      { upsert: true, returnDocument: 'after' },
+    );
+    return Boolean(record && record.count <= LOGIN_MAX_ATTEMPTS);
+  }
+
+  // Local-only fallback for development. Production always requires MongoDB.
+  const recent = (localLoginAttempts.get(normalizedIp) || []).filter((timestamp) => now - timestamp < LOGIN_WINDOW_MS);
+  if (recent.length >= LOGIN_MAX_ATTEMPTS) return false;
+  recent.push(now);
+  localLoginAttempts.set(normalizedIp, recent);
+  return true;
+}
 
 function getCookie(request, name) {
   const cookie = request.headers.cookie || '';
@@ -217,7 +355,10 @@ async function loadContent() {
   if (usingDb) {
     const content = await loadContentFromDb();
     if (content) return content;
-    // Fall back to file if DB unexpectedly empty
+    throw new Error('MongoDB is connected but the site-content record is missing.');
+  }
+  if (isProduction) {
+    throw new Error('Production persistence is unavailable; refusing file-based fallback.');
   }
   return loadContentFile();
 }
@@ -864,41 +1005,65 @@ app.get('/api/session', (request, response) => {
   });
 });
 
-app.post('/api/login', (request, response) => {
-  const { username, password } = request.body ?? {};
+app.post('/api/login', async (request, response) => {
+  try {
+    if (!(await consumeLoginAttempt(request.ip))) {
+      response.status(429).json({ error: 'Too many login attempts. Please try again later.' });
+      return;
+    }
 
-  if (!hasAdminCredentials) {
+    const { username, password } = request.body ?? {};
+
+    if (!hasAdminCredentials) {
     response.status(503).json({ error: 'Admin authentication is not configured in this environment.' });
     return;
   }
 
-  if (!username || !password) {
-    response.status(400).json({ error: 'Username and password are required.' });
-    return;
+    if (!username || !password) {
+      response.status(400).json({ error: 'Username and password are required.' });
+      return;
+    }
+
+    const usernameMatches = timingSafeEquals(String(username), String(adminUsername));
+    const passwordMatches = timingSafeEquals(String(password), String(adminPassword));
+
+    if (!usernameMatches || !passwordMatches) {
+      response.status(401).json({ error: 'Invalid credentials.' });
+      return;
+    }
+
+    request.session.regenerate((regenerateError) => {
+      if (regenerateError) {
+        response.status(500).json({ error: 'Unable to establish a secure session.' });
+        return;
+      }
+
+      request.session.user = {
+        username: String(username),
+        role: 'admin',
+      };
+
+      request.session.save((saveError) => {
+        if (saveError) {
+          response.status(500).json({ error: 'Unable to save the session securely.' });
+          return;
+        }
+
+        response.json({
+          authenticated: true,
+          isAdmin: true,
+          user: { username: String(username) },
+        });
+      });
+    });
+  } catch (error) {
+    console.error('Admin login failed:', error && error.message);
+    response.status(500).json({ error: 'Unable to process login.' });
   }
-
-  const usernameMatches = timingSafeEquals(String(username), String(adminUsername));
-  const passwordMatches = timingSafeEquals(String(password), String(adminPassword));
-
-  if (!usernameMatches || !passwordMatches) {
-    response.status(401).json({ error: 'Invalid credentials.' });
-    return;
-  }
-
-  request.session.user = {
-    username: String(username),
-    role: 'admin',
-  };
-
-  response.json({
-    authenticated: true,
-    isAdmin: true,
-    user: { username: String(username) },
-  });
 });
 
-// Development helper: initialize admin credentials on environments without admin configured
-app.post('/api/setup-admin', async (request, response) => {
+// Development-only helper. Credentials remain in memory and are never written to disk.
+app.post('/api/setup-admin', (request, response) => {
   if (process.env.NODE_ENV === 'production') {
     response.status(403).json({ error: 'Not allowed in production.' });
     return;
@@ -910,28 +1075,17 @@ app.post('/api/setup-admin', async (request, response) => {
   }
 
   const { username, password } = request.body ?? {};
-  if (!username || !password) {
-    response.status(400).json({ error: 'username and password are required.' });
+  const safeUsername = String(username).trim();
+  const safePassword = String(password);
+  if (safeUsername.length < 3 || safeUsername.length > 64 || safePassword.length < 16) {
+    response.status(400).json({ error: 'Use a username of 3–64 characters and a password of at least 16 characters.' });
     return;
   }
 
-  try {
-    const adminPath = path.join(__dirname, 'data');
-    await fs.mkdir(adminPath, { recursive: true });
-    const adminFile = path.join(adminPath, 'admin.json');
-    const payload = { username: String(username), password: String(password) };
-    await fs.writeFile(adminFile, JSON.stringify(payload, null, 2), 'utf8');
-
-    // Apply in-memory so server starts honoring the new credentials immediately
-    adminUsername = String(username);
-    adminPassword = String(password);
-    hasAdminCredentials = true;
-
-    response.json({ success: true });
-  } catch (err) {
-    console.error('Unable to write admin credentials:', err && err.message);
-    response.status(500).json({ error: 'Unable to persist admin credentials.' });
-  }
+  adminUsername = safeUsername;
+  adminPassword = safePassword;
+  hasAdminCredentials = true;
+  response.json({ success: true, note: 'Credentials are stored in memory only and reset when the server restarts.' });
 });
 
 app.post('/api/logout', (request, response) => {
@@ -1491,39 +1645,29 @@ let initializationPromise = null;
 export function initializeApplication() {
   if (!initializationPromise) {
     initializationPromise = (async () => {
-      // Try to load admin credentials from disk if environment variables are not provided
-      try {
-        const adminFile = path.join(__dirname, 'data', 'admin.json');
-        const raw = await fs.readFile(adminFile, 'utf8').catch(() => null);
-        if (raw) {
-          try {
-            const parsed = JSON.parse(raw);
-            // Prefer admin.json when present to allow local dev overrides
-            if (parsed.username) adminUsername = String(parsed.username);
-            if (parsed.password) adminPassword = String(parsed.password);
-            hasAdminCredentials = Boolean(adminUsername && adminPassword);
-            if (hasAdminCredentials) console.log('Admin credentials loaded from server/data/admin.json');
-          } catch (e) {
-            // ignore parse errors
-          }
-        }
-      } catch (err) {
-        // ignore
+      if (isProduction && !hasAdminCredentials) {
+        throw new Error('Production admin credentials must be provided through environment variables.');
       }
 
-      if (process.env.MONGODB_URI || process.env.DATABASE_URL) {
+      if (configuredMongoUri) {
         try {
           await initDb();
           usingDb = true;
           console.log('MongoDB connected successfully: using MongoDB for persistence');
         } catch (dbError) {
           usingDb = false;
-          console.warn('MongoDB connection failed — falling back to local file-based persistence.');
+          if (isProduction) {
+            throw new Error(`MongoDB initialization failed in production: ${dbError.message}`);
+          }
+          console.warn('MongoDB connection failed; using local file-based persistence for development only.');
           console.warn(`[MongoDB Notice] ${dbError.message}`);
         }
       } else {
         usingDb = false;
-        console.log('No DATABASE_URL found — using file-based persistence');
+        if (isProduction) {
+          throw new Error('MONGODB_URI is required in production.');
+        }
+        console.log('No MongoDB URI found; using file-based persistence for local development.');
       }
     })();
   }
