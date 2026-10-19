@@ -1015,9 +1015,9 @@ app.post('/api/login', async (request, response) => {
     const { username, password } = request.body ?? {};
 
     if (!hasAdminCredentials) {
-    response.status(503).json({ error: 'Admin authentication is not configured in this environment.' });
-    return;
-  }
+      response.status(503).json({ error: 'Admin authentication is not configured in this environment.' });
+      return;
+    }
 
     if (!username || !password) {
       response.status(400).json({ error: 'Username and password are required.' });
@@ -1075,6 +1075,11 @@ app.post('/api/setup-admin', (request, response) => {
   }
 
   const { username, password } = request.body ?? {};
+  if (!username || !password) {
+    response.status(400).json({ error: 'Username and password are required.' });
+    return;
+  }
+
   const safeUsername = String(username).trim();
   const safePassword = String(password);
   if (safeUsername.length < 3 || safeUsername.length > 64 || safePassword.length < 16) {
