@@ -51,6 +51,17 @@ dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3001;
+
+// Ensure persistence is ready even when Vercel invokes this Express app directly.
+app.use(async (request, response, next) => {
+  try {
+    await initializeApplication();
+    next();
+  } catch (error) {
+    console.error('Backend initialization failed; request was not processed.');
+    response.status(503).json({ error: 'Service temporarily unavailable. Please try again.' });
+  }
+});
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const dataFilePath = path.join(__dirname, 'data', 'content.json');
