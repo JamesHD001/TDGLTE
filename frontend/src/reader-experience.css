@@ -75,6 +75,7 @@
 }
 
 .reader-chapter-toggle {
+  display: none;
   min-height: 2.5rem;
   padding: 0.55rem 0.8rem;
   color: var(--reader-text);
@@ -302,6 +303,10 @@
 }
 
 @media (max-width: 840px) {
+  .reader-experience .reader-chapter-toggle {
+    display: inline-flex;
+  }
+
   .reader-experience .chapter-sidebar {
     display: none;
     order: -1;
