@@ -5,9 +5,9 @@ export const mysticPenHDContent = {
     name: 'Henry D. James',
     title: 'Author & Creator of MysticPenHD',
     tagline:
-      'A Nigerian writer, creative worldbuilder, and storyteller exploring dark fantasy, mystery, supernatural worlds, and the consequences of human choices.',
+      'Nigerian writer and creator of original fictional worlds, including THE DAY GOOD LOST TO EVIL.',
     bio:
-      'Henry D. James is a writer, creative worldbuilder, graphic designer, and software development student who creates stories across different genres and fictional worlds. His work combines imagination, character-driven storytelling, mystery, supernatural elements, and detailed worldbuilding. MysticPenHD serves as the home for his original novels, stories, characters, and the worlds behind them.',
+      'Henry D. James is a Nigerian writer and the creator of MysticPenHD. His ongoing novel THE DAY GOOD LOST TO EVIL explores a world whose origins reach back to the Architects and the Void, where Rick’s convictions are tested by forces that question the meaning of existence. Through MysticPenHD, he develops original stories, characters, and fictional worlds.',
     achievements: [
       'Founder and creator of MysticPenHD',
       'Author of THE DAY GOOD LOST TO EVIL (TDGLTE)',
@@ -26,29 +26,29 @@ export const mysticPenHDContent = {
       shortTitle: 'TDGLTE',
 
       subtitle:
-        'A dark fantasy story of ancient powers, cursed destinies, and the struggle between good and evil.',
+        'A dark fantasy novel about Rick, the Architects, and a conflict between creation and the Void.',
 
       tagline:
-        'Ancient powers. Forgotten history. A curse that binds the fate of generations.',
+        'The Architects shaped existence. The Arkhals would return it to the Void.',
 
       coverAsset: '/tdglte-cover.svg',
 
       summary:
-        'THE DAY GOOD LOST TO EVIL follows Rick as he is drawn into a world shaped by ancient powers, forgotten history, demons, dragons, and the mysterious Curse of the Architects. What begins as a personal journey gradually leads into a much older conflict whose consequences reach across generations.',
+        'THE DAY GOOD LOST TO EVIL follows Rick into a world shaped by the legacy of the Architects, demons, dragons, Wyrms, and Arkhals born of the Void. As the world’s hidden history unfolds, Rick encounters a force that believes existence itself is a mistake. His journey brings the conflict between creation and the Void into sharp focus.',
 
       metadata: {
-        series: 'MysticPenHD',
+        series: 'THE DAY GOOD LOST TO EVIL',
         volume: 'Book I',
-        genre: 'Dark Fantasy',
-        mood: 'Dark, mysterious, epic, supernatural',
+        genre: 'Dark Fantasy / Action / Adventure',
+        mood: 'Cosmic, intense, philosophical, supernatural',
         themes: [
           'Good vs Evil',
-          'Ancient Powers',
+          'Creation and the Void',
           'Curses',
           'Destiny',
           'Sacrifice',
           'Power',
-          'Forgotten History',
+          'The Architects',
           'Demons',
           'Dragons',
           'Mystery',
