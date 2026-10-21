@@ -959,20 +959,9 @@ function StoryReaderPage({ book, loading, error }) {
     const progressKey = `mysticpenhd-reader-progress:${book?.slug || 'default'}:${selectedChapter.slug}`;
 
     let restoreFrame;
+    let savedProgress = 0;
     try {
-      const savedProgress = Number(window.localStorage.getItem(progressKey) || 0);
-      if (savedProgress > 0 && savedProgress <= 100) {
-        restoreFrame = window.requestAnimationFrame(() => {
-          const article = document.getElementById(selectedChapter.slug);
-          if (!article) return;
-          const chapterTop = article.getBoundingClientRect().top + window.scrollY;
-          const scrollableChapterHeight = Math.max(0, article.offsetHeight - window.innerHeight);
-          window.scrollTo({
-            top: chapterTop + (scrollableChapterHeight * savedProgress) / 100,
-            behavior: 'auto',
-          });
-        });
-      }
+      savedProgress = Number(window.localStorage.getItem(progressKey) || 0);
     } catch {
       // Reading position is optional and should never block the chapter.
     }
@@ -993,8 +982,23 @@ function StoryReaderPage({ book, loading, error }) {
       }
     };
 
+    if (!location.hash && savedProgress > 0 && savedProgress <= 100) {
+      restoreFrame = window.requestAnimationFrame(() => {
+        const article = document.getElementById(selectedChapter.slug);
+        if (!article) return;
+        const chapterTop = article.getBoundingClientRect().top + window.scrollY;
+        const scrollableChapterHeight = Math.max(0, article.offsetHeight - window.innerHeight);
+        window.scrollTo({
+          top: chapterTop + (scrollableChapterHeight * savedProgress) / 100,
+          behavior: 'auto',
+        });
+        updateProgress();
+      });
+    } else {
+      updateProgress();
+    }
+
     window.addEventListener('scroll', updateProgress, { passive: true });
-    updateProgress();
     return () => {
       if (restoreFrame !== undefined) window.cancelAnimationFrame(restoreFrame);
       window.removeEventListener('scroll', updateProgress);
