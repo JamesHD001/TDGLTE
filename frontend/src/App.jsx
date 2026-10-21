@@ -286,8 +286,8 @@ function HomePage({ book, loading, error }) {
         {summary && (
           <section className="intro-panel">
             <div className="container inset-card">
-              <p className="eyebrow">A story of ancient oaths and cursed destinies</p>
-              <h2>When ancient powers awaken, forgotten burdens return to those who were never meant to bear them.</h2>
+              <p className="eyebrow">The Architects. The Void. The question of existence.</p>
+              <h2>Rick’s world was shaped by the Architects. Now an Arkhal seeks to return existence to the Void.</h2>
               <RichTextContent content={summary} />
             </div>
           </section>
@@ -377,7 +377,7 @@ function StoryPage({ book, loading, error }) {
           <button type="button" className="story-card" onClick={() => navigate('/world-building')}>
             <span className="card-kicker">World Building</span>
             <h2>Explore the lore</h2>
-            <p>Discover the Architects, ancient dragons, cursed destinies, demons, and forgotten history that shape the world.</p>
+            <p>Explore the Architects, Arch Dragons, Wyrms, demons, and Arkhals born of the Void, and discover how their histories shape the world.</p>
             <span className="card-action">Open archive</span>
           </button>
 
@@ -385,7 +385,7 @@ function StoryPage({ book, loading, error }) {
             <Link to={`/story-reader/${firstChapterSlug}`} className="story-card story-card-secondary">
               <span className="card-kicker">Read the Story</span>
               <h2>Begin the novel</h2>
-              <p>Follow Rick's journey as he is drawn into a world shaped by ancient powers, deadly curses, and secrets buried across the ages.</p>
+              <p>Follow Rick as he faces a force that questions the very right of existence to endure.</p>
               <span className="card-action">Read now</span>
             </Link>
           ) : (
@@ -441,7 +441,7 @@ function WorldBuildingPage({ book, loading, error }) {
     <>
       <PageMeta
         title="World Building"
-        description="Explore the history, lore, ancient powers, dragons, demons, and Architect legacy."
+        description="Explore the world of THE DAY GOOD LOST TO EVIL: the Architects, the Void, Arkhals, dragons, demons, and the history surrounding Rick."
       />
       <main className="reader-page world-reader">
         <div className="container reading-shell reader-layout">
