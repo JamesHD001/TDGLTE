@@ -102,7 +102,8 @@ function mergeChapters(localChapters, currentChapters, bookTitle, report) {
     const keys = chapterKeys(localChapter);
     keys.forEach((key) => localKeys.add(key));
     const currentChapter = keys.map((key) => currentByKey.get(key)).find(Boolean);
-    return currentChapter ? { ...currentChapter, ...localChapter } : localChapter;
+    // Preserve existing admin-edited chapter fields; use local data only to fill missing fields.
+    return currentChapter ? { ...localChapter, ...currentChapter } : localChapter;
   });
   const databaseOnlyChapters = currentChapters.filter((chapter) => {
     const keys = chapterKeys(chapter);
