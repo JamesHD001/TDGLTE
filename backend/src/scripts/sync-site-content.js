@@ -89,34 +89,20 @@ function chapterKeys(chapter) {
   return keys;
 }
 
-function mergeChapters(localChapters, currentChapters, bookTitle, report) {
-  const currentByKey = new Map();
-  for (const chapter of currentChapters) {
-    for (const key of chapterKeys(chapter)) {
-      if (!currentByKey.has(key)) currentByKey.set(key, chapter);
-    }
-  }
-
-  const localKeys = new Set();
-  const mergedLocalChapters = localChapters.map((localChapter) => {
-    const keys = chapterKeys(localChapter);
-    keys.forEach((key) => localKeys.add(key));
-    const currentChapter = keys.map((key) => currentByKey.get(key)).find(Boolean);
-    // Preserve existing admin-edited chapter fields; use local data only to fill missing fields.
-    return currentChapter ? { ...localChapter, ...currentChapter } : localChapter;
-  });
-  const databaseOnlyChapters = currentChapters.filter((chapter) => {
-    const keys = chapterKeys(chapter);
-    return keys.length === 0 || !keys.some((key) => localKeys.has(key));
-  });
-
-  if (databaseOnlyChapters.length > 0) {
+function preserveExistingChapters(localChapters, currentChapters, bookTitle, report) {
+  // Metadata-only sync: preserve the entire existing database chapter array, including
+  // admin edits, ordering, and chapters that do not exist in the local source.
+  if (currentChapters.length > 0) {
     report.preservedChapterCounts.push({
       book: bookTitle,
-      count: databaseOnlyChapters.length,
+      databaseCount: currentChapters.length,
+      localCount: localChapters.length,
     });
+    return currentChapters;
   }
-  return [...mergedLocalChapters, ...databaseOnlyChapters];
+
+  // If the database has no chapters for this book, allow local chapters to seed it.
+  return localChapters;
 }
 
 function mergeContentPreservingChapters(localContent, currentContent) {
@@ -132,14 +118,11 @@ function mergeContentPreservingChapters(localContent, currentContent) {
 
     const localChapters = Array.isArray(localBook.chapters) ? localBook.chapters : [];
     const currentChapters = Array.isArray(currentBook.chapters) ? currentBook.chapters : [];
-    if (localChapters.length === 0 && currentChapters.length > 0) {
-      throw new Error(`Refusing to replace "${localBook.title || localBook.slug}" with an empty local chapter list.`);
-    }
 
     return {
       ...currentBook,
       ...localBook,
-      chapters: mergeChapters(localChapters, currentChapters, localBook.title || localBook.slug, report),
+      chapters: preserveExistingChapters(localChapters, currentChapters, localBook.title || localBook.slug, report),
     };
   });
 
@@ -193,10 +176,10 @@ async function main() {
     console.log(`Existing site-content record: found (${existingDocument._id})`);
     console.log(`Local books: ${localContent.books.length}`);
     console.log(`Books retained from database but absent locally: ${report.preservedDatabaseOnlyBooks.length}`);
-    console.log(`Books with database-only chapters retained: ${report.preservedChapterCounts.length}`);
+    console.log(`Books whose existing chapter arrays will be preserved: ${report.preservedChapterCounts.length}`);
 
     for (const item of report.preservedChapterCounts) {
-      console.log(`  - ${item.book}: retaining ${item.count} database-only chapters`);
+      console.log(`  - ${item.book}: preserving all ${item.databaseCount} database chapters; local chapters available but not applied: ${item.localCount}`);
     }
     for (const book of report.preservedDatabaseOnlyBooks) {
       console.log(`  - Retaining database-only book: ${book}`);
@@ -204,7 +187,7 @@ async function main() {
 
     const unchanged = JSON.stringify(existingDocument.value) === JSON.stringify(mergedContent);
     console.log(`Content differs from proposed merged version: ${!unchanged}`);
-    console.log('Other collections (comments, likes, reports, messages, characters) will not be modified.');
+    console.log('Existing chapter arrays for books with database chapters will not be modified. Other collections (comments, likes, reports, messages, characters) will not be modified.');
 
     if (!applyChanges) {
       console.log('No database changes made. Review this report, then rerun with --apply to proceed.');
@@ -240,7 +223,7 @@ async function main() {
 
     console.log('Content sync completed.');
     console.log(`Backup saved in content_backups with ID: ${backup.insertedId}`);
-    console.log('Only the site-content document was updated; user engagement collections were left untouched.');
+    console.log('Only the site-content document was updated. Existing chapter arrays and user engagement collections were left untouched.');
   } finally {
     await client.close();
   }
