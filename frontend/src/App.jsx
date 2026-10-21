@@ -936,27 +936,27 @@ function StoryReaderPage({ book, loading, error }) {
   useEffect(() => {
     if (loading || !chapters.length || chapterSlug) return;
     try {
-      const lastChapter = window.localStorage.getItem('mysticpenhd-last-chapter');
+      const lastChapter = window.localStorage.getItem(`mysticpenhd-last-chapter:${book?.slug || 'default'}`);
       if (lastChapter && chapters.some((chapter) => chapter.slug === lastChapter)) {
         navigate(`/story-reader/${lastChapter}`, { replace: true });
       }
     } catch {
       // Continue with the first chapter if local storage is unavailable.
     }
-  }, [chapterSlug, chapters, loading, navigate]);
+  }, [book?.slug, chapterSlug, chapters, loading, navigate]);
 
   useEffect(() => {
     if (!chapterSlug) return;
     try {
-      window.localStorage.setItem('mysticpenhd-last-chapter', chapterSlug);
+      window.localStorage.setItem(`mysticpenhd-last-chapter:${book?.slug || 'default'}`, chapterSlug);
     } catch {
       // Remembering the last chapter is optional.
     }
-  }, [chapterSlug]);
+  }, [book?.slug, chapterSlug]);
 
   useEffect(() => {
     if (!selectedChapter?.slug) return undefined;
-    const progressKey = `mysticpenhd-reader-progress:${selectedChapter.slug}`;
+    const progressKey = `mysticpenhd-reader-progress:${book?.slug || 'default'}:${selectedChapter.slug}`;
 
     let restoreFrame;
     try {
@@ -999,7 +999,7 @@ function StoryReaderPage({ book, loading, error }) {
       if (restoreFrame !== undefined) window.cancelAnimationFrame(restoreFrame);
       window.removeEventListener('scroll', updateProgress);
     };
-  }, [selectedChapter?.slug]);
+  }, [book?.slug, selectedChapter?.slug]);
 
   if (loading) {
     return (
