@@ -74,27 +74,38 @@ function validateLocalContent(content) {
   }
 }
 
-function chapterKey(chapter) {
-  if (chapter?.slug) return `slug:${chapter.slug}`;
-  if (Number.isFinite(Number(chapter?.number))) return `number:${Number(chapter.number)}`;
-  if (chapter?.id) return `id:${chapter.id}`;
-  return null;
+function chapterKeys(chapter) {
+  const keys = [];
+  if (typeof chapter?.slug === 'string' && chapter.slug.trim()) {
+    keys.push(`slug:${chapter.slug}`);
+  }
+  if (typeof chapter?.number === 'number' && Number.isFinite(chapter.number)) {
+    keys.push(`number:${chapter.number}`);
+  }
+  if (typeof chapter?.id === 'string' && chapter.id.trim()) {
+    keys.push(`id:${chapter.id}`);
+  }
+  return keys;
 }
 
 function mergeChapters(localChapters, currentChapters, bookTitle, report) {
-  const currentByKey = new Map(
-    currentChapters.map((chapter) => [chapterKey(chapter), chapter]).filter(([key]) => key),
-  );
+  const currentByKey = new Map();
+  for (const chapter of currentChapters) {
+    for (const key of chapterKeys(chapter)) {
+      if (!currentByKey.has(key)) currentByKey.set(key, chapter);
+    }
+  }
+
   const localKeys = new Set();
   const mergedLocalChapters = localChapters.map((localChapter) => {
-    const key = chapterKey(localChapter);
-    if (key) localKeys.add(key);
-    const currentChapter = key ? currentByKey.get(key) : null;
+    const keys = chapterKeys(localChapter);
+    keys.forEach((key) => localKeys.add(key));
+    const currentChapter = keys.map((key) => currentByKey.get(key)).find(Boolean);
     return currentChapter ? { ...currentChapter, ...localChapter } : localChapter;
   });
   const databaseOnlyChapters = currentChapters.filter((chapter) => {
-    const key = chapterKey(chapter);
-    return !key || !localKeys.has(key);
+    const keys = chapterKeys(chapter);
+    return keys.length === 0 || !keys.some((key) => localKeys.has(key));
   });
 
   if (databaseOnlyChapters.length > 0) {
