@@ -95,16 +95,14 @@ export default function ReaderToolbar({
           <span>Chapter progress</span>
           <span>{progress}%</span>
         </div>
-        <div
+        <progress
           className="reader-progress-track"
-          role="progressbar"
           aria-label="Current chapter reading progress"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          aria-valuenow={progress}
+          value={progress}
+          max="100"
         >
-          <span className="reader-progress-value" style={{ width: `${progress}%` }} />
-        </div>
+          {progress}%
+        </progress>
       </div>
     </section>
   );
