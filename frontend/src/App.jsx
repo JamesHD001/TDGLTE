@@ -1042,6 +1042,7 @@ function StoryReaderPage({ book, loading, error }) {
       >
         <div className="container reading-shell reader-layout">
           <aside
+            id="reader-chapter-list"
             className={chapterListOpen ? 'chapter-sidebar is-open' : 'chapter-sidebar'}
             aria-label="Chapter navigation"
           >
