@@ -897,6 +897,21 @@ function StoryReaderPage({ book, loading, error }) {
   const { chapterSlug } = useParams();
   const location = useLocation();
 
+  const chapters = Array.isArray(book?.chapters) ? book.chapters : [];
+  const selectedChapter =
+    chapters.find((chapter) => chapter.slug === chapterSlug) ?? chapters[0];
+
+  useEffect(() => {
+    if (!location.hash) {
+      return;
+    }
+
+    const target = document.getElementById(location.hash.replace('#', ''));
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [location.hash, selectedChapter?.slug]);
+
   if (loading) {
     return (
       <main className="reader-page">
@@ -908,33 +923,24 @@ function StoryReaderPage({ book, loading, error }) {
     );
   }
 
-  if (error || !book || !Array.isArray(book.chapters) || book.chapters.length === 0) {
+  if (error || chapters.length === 0) {
     return (
       <main className="reader-page">
         <div className="container reading-shell">
           <p className="eyebrow">Reading Room</p>
-          <p className="form-status">{error || 'No chapter information is currently available.'}</p>
+          <p className="form-status">
+            {error || 'No chapter information is currently available.'}
+          </p>
         </div>
       </main>
     );
   }
 
-  const chapters = book.chapters;
-  const selectedChapter = chapters.find((chapter) => chapter.slug === chapterSlug) ?? chapters[0];
-  const chapterIndex = chapters.findIndex((chapter) => chapter.slug === selectedChapter.slug);
+  const chapterIndex = chapters.findIndex(
+    (chapter) => chapter.slug === selectedChapter.slug
+  );
   const previousChapter = chapters[chapterIndex - 1];
   const nextChapter = chapters[chapterIndex + 1];
-
-  useEffect(() => {
-    if (!location.hash) {
-      return;
-    }
-
-    const target = document.getElementById(location.hash.replace('#', ''));
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, [location.hash, selectedChapter.slug]);
 
   return (
     <>

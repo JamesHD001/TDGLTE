@@ -62,16 +62,29 @@ async function ensureIndexes() {
 }
 
 async function migrateLegacyContent() {
-  const content = await database.collection('content').findOne({ key: 'site-content' });
+  const contentCollection = database.collection('content');
+  const content = await contentCollection.findOne({ key: 'site-content' });
   if (content) return;
 
-  await database.collection('content').insertOne({
-    key: 'site-content',
-    value: await readLegacyContent(),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
-  console.log('Legacy JSON content migrated to MongoDB.');
+  try {
+    await contentCollection.updateOne(
+      { key: 'site-content' },
+      {
+        $setOnInsert: {
+          value: await readLegacyContent(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      },
+      { upsert: true },
+    );
+    console.log('Legacy JSON content migration checked.');
+  } catch (error) {
+    // A second instance may insert the same unique key at the same time.
+    if (error?.code !== 11000) throw error;
+    const winner = await contentCollection.findOne({ key: 'site-content' });
+    if (!winner) throw error;
+  }
 }
 
 export async function initDb() {
@@ -90,12 +103,20 @@ export async function initDb() {
     clientOptions.tlsAllowInvalidCertificates = true;
   }
 
-  client = new MongoClient(connectionString, clientOptions);
-  await client.connect();
-  database = client.db(process.env.MONGODB_DB || undefined);
-  await ensureIndexes();
-  await migrateLegacyContent();
-  return database;
+  const nextClient = new MongoClient(connectionString, clientOptions);
+  try {
+    await nextClient.connect();
+    client = nextClient;
+    database = nextClient.db(process.env.MONGODB_DB || undefined);
+    await ensureIndexes();
+    await migrateLegacyContent();
+    return database;
+  } catch (error) {
+    database = null;
+    client = null;
+    await nextClient.close().catch(() => {});
+    throw error;
+  }
 }
 
 export async function getSiteContent() {

@@ -30,3 +30,6 @@ Thumbs.db
 *.pem
 *.key
 *.crt
+
+# Local admin credentials must never be committed
+backend/src/data/admin.json

@@ -51,6 +51,17 @@ dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3001;
+
+// Ensure persistence is ready even when Vercel invokes this Express app directly.
+app.use(async (request, response, next) => {
+  try {
+    await initializeApplication();
+    next();
+  } catch (error) {
+    console.error('Backend initialization failed; request was not processed.');
+    response.status(503).json({ error: 'Service temporarily unavailable. Please try again.' });
+  }
+});
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const dataFilePath = path.join(__dirname, 'data', 'content.json');
@@ -60,7 +71,10 @@ const clientOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
-const sessionSecret = process.env.SESSION_SECRET || 'mysticpenhd-development-secret-change-me';
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret) {
+  throw new Error('SESSION_SECRET must be set in the environment.');
+}
 const awsRegion = process.env.AWS_REGION;
 const awsAccessKeyId = process.env.AWS_ACCESS_KEY_ID;
 const awsSecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
@@ -70,7 +84,9 @@ const hasS3Config = Boolean(awsRegion && awsAccessKeyId && awsSecretAccessKey &&
 let hasAdminCredentials = Boolean(adminUsername && adminPassword);
 
 if (!hasAdminCredentials) {
-  console.warn('Admin authentication is not configured. You can set ADMIN_USERNAME and ADMIN_PASSWORD environment variables, or use the development setup endpoint to initialize credentials (not allowed in production).');
+  console.warn(
+    'Admin authentication is not configured. Set ADMIN_USERNAME and ADMIN_PASSWORD environment variables.'
+  );
 }
 
 app.use(
@@ -897,43 +913,6 @@ app.post('/api/login', (request, response) => {
   });
 });
 
-// Development helper: initialize admin credentials on environments without admin configured
-app.post('/api/setup-admin', async (request, response) => {
-  if (process.env.NODE_ENV === 'production') {
-    response.status(403).json({ error: 'Not allowed in production.' });
-    return;
-  }
-
-  if (hasAdminCredentials) {
-    response.status(400).json({ error: 'Admin credentials already configured.' });
-    return;
-  }
-
-  const { username, password } = request.body ?? {};
-  if (!username || !password) {
-    response.status(400).json({ error: 'username and password are required.' });
-    return;
-  }
-
-  try {
-    const adminPath = path.join(__dirname, 'data');
-    await fs.mkdir(adminPath, { recursive: true });
-    const adminFile = path.join(adminPath, 'admin.json');
-    const payload = { username: String(username), password: String(password) };
-    await fs.writeFile(adminFile, JSON.stringify(payload, null, 2), 'utf8');
-
-    // Apply in-memory so server starts honoring the new credentials immediately
-    adminUsername = String(username);
-    adminPassword = String(password);
-    hasAdminCredentials = true;
-
-    response.json({ success: true });
-  } catch (err) {
-    console.error('Unable to write admin credentials:', err && err.message);
-    response.status(500).json({ error: 'Unable to persist admin credentials.' });
-  }
-});
-
 app.post('/api/logout', (request, response) => {
   if (request.session) {
     request.session.destroy((error) => {
@@ -1488,46 +1467,34 @@ app.get('/api/messages/stream', requireAuthentication, requireAdmin, async (requ
 // Initialize persistence once. This is used by both the local server and Vercel handler.
 let initializationPromise = null;
 
+
 export function initializeApplication() {
   if (!initializationPromise) {
     initializationPromise = (async () => {
-      // Try to load admin credentials from disk if environment variables are not provided
-      try {
-        const adminFile = path.join(__dirname, 'data', 'admin.json');
-        const raw = await fs.readFile(adminFile, 'utf8').catch(() => null);
-        if (raw) {
-          try {
-            const parsed = JSON.parse(raw);
-            // Prefer admin.json when present to allow local dev overrides
-            if (parsed.username) adminUsername = String(parsed.username);
-            if (parsed.password) adminPassword = String(parsed.password);
-            hasAdminCredentials = Boolean(adminUsername && adminPassword);
-            if (hasAdminCredentials) console.log('Admin credentials loaded from server/data/admin.json');
-          } catch (e) {
-            // ignore parse errors
-          }
-        }
-      } catch (err) {
-        // ignore
+      if (!process.env.MONGODB_URI && !process.env.DATABASE_URL) {
+        throw new Error(
+          'MongoDB connection is required. Set MONGODB_URI or DATABASE_URL.'
+        );
       }
 
-      if (process.env.MONGODB_URI || process.env.DATABASE_URL) {
-        try {
-          await initDb();
-          usingDb = true;
-          console.log('MongoDB connected successfully: using MongoDB for persistence');
-        } catch (dbError) {
-          usingDb = false;
-          console.warn('MongoDB connection failed — falling back to local file-based persistence.');
-          console.warn(`[MongoDB Notice] ${dbError.message}`);
-        }
-      } else {
+      try {
+        await initDb();
+        usingDb = true;
+        console.log(
+          'MongoDB connected successfully: using MongoDB for persistence'
+        );
+      } catch (dbError) {
         usingDb = false;
-        console.log('No DATABASE_URL found — using file-based persistence');
+        console.error(
+          'MongoDB initialization failed. Refusing to start without database persistence.'
+        );
+        throw dbError;
       }
     })();
   }
+
   return initializationPromise;
 }
+
 
 export default app;
