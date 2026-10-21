@@ -929,8 +929,8 @@ function StoryReaderPage({ book, loading, error }) {
 
   useEffect(() => {
     if (!location.hash) return;
-    const target = document.getElementById(location.hash.replace('#', ''));
-    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const target = document.getElementById(location.hash.slice(1));
+    if (target) target.scrollIntoView({ behavior: 'auto', block: 'start' });
   }, [location.hash, selectedChapter?.slug]);
 
   useEffect(() => {
@@ -1003,7 +1003,7 @@ function StoryReaderPage({ book, loading, error }) {
       if (restoreFrame !== undefined) window.cancelAnimationFrame(restoreFrame);
       window.removeEventListener('scroll', updateProgress);
     };
-  }, [book?.slug, selectedChapter?.slug]);
+  }, [book?.slug, location.hash, selectedChapter?.slug]);
 
   if (loading) {
     return (
