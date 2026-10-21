@@ -75,67 +75,43 @@ function validateLocalContent(content) {
   }
 }
 
-function chapterKeys(chapter) {
-  const keys = [];
-  if (typeof chapter?.slug === 'string' && chapter.slug.trim()) {
-    keys.push(`slug:${chapter.slug}`);
-  }
-  if (typeof chapter?.number === 'number' && Number.isFinite(chapter.number)) {
-    keys.push(`number:${chapter.number}`);
-  }
-  if (typeof chapter?.id === 'string' && chapter.id.trim()) {
-    keys.push(`id:${chapter.id}`);
-  }
-  return keys;
-}
-
-function preserveExistingChapters(localChapters, currentChapters, bookTitle, report) {
-  // Metadata-only sync: preserve the entire existing database chapter array, including
-  // admin edits, ordering, and chapters that do not exist in the local source.
-  if (currentChapters.length > 0) {
-    report.preservedChapterCounts.push({
-      book: bookTitle,
-      databaseCount: currentChapters.length,
-      localCount: localChapters.length,
-    });
-    return currentChapters;
-  }
-
-  // If the database has no chapters for this book, allow local chapters to seed it.
-  return localChapters;
-}
-
-function mergeContentPreservingChapters(localContent, currentContent) {
+function mergeContentMetadata(localContent, currentContent) {
+  const localBook = localContent.books.find((book) => book?.slug === TDGLTE_SLUG);
   const currentBooks = Array.isArray(currentContent?.books) ? currentContent.books : [];
-  const localBooks = Array.isArray(localContent?.books) ? localContent.books : [];
-  const currentBooksBySlug = new Map(currentBooks.map((book) => [book.slug, book]));
-  const localSlugs = new Set(localBooks.map((book) => book.slug));
-  const report = { preservedChapterCounts: [], preservedDatabaseOnlyBooks: [] };
+  const currentBookIndex = currentBooks.findIndex((book) => book?.slug === TDGLTE_SLUG);
 
-  const mergedBooks = localBooks.map((localBook) => {
-    const currentBook = currentBooksBySlug.get(localBook.slug);
-    if (!currentBook) return localBook;
+  if (!localBook) {
+    throw new Error('The local source does not contain the TDGLTE metadata entry.');
+  }
+  if (currentBookIndex < 0) {
+    throw new Error('The database does not contain an existing TDGLTE book entry. No new book or chapter data will be created by this metadata-only sync.');
+  }
 
-    const localChapters = Array.isArray(localBook.chapters) ? localBook.chapters : [];
-    const currentChapters = Array.isArray(currentBook.chapters) ? currentBook.chapters : [];
+  const currentBook = currentBooks[currentBookIndex];
+  const metadataFields = ['title', 'shortTitle', 'subtitle', 'tagline', 'summary', 'coverAsset', 'metadata'];
+  const updatedBook = { ...currentBook };
+  for (const field of metadataFields) {
+    if (Object.prototype.hasOwnProperty.call(localBook, field)) {
+      updatedBook[field] = localBook[field];
+    }
+  }
 
-    return {
-      ...currentBook,
-      ...localBook,
-      chapters: preserveExistingChapters(localChapters, currentChapters, localBook.title || localBook.slug, report),
-    };
-  });
-
-  const databaseOnlyBooks = currentBooks.filter((book) => !localSlugs.has(book.slug));
-  report.preservedDatabaseOnlyBooks = databaseOnlyBooks.map((book) => book.slug || book.title);
-
+  const books = [...currentBooks];
+  books[currentBookIndex] = updatedBook;
   return {
     content: {
       ...currentContent,
-      ...localContent,
-      books: [...mergedBooks, ...databaseOnlyBooks],
+      siteName: localContent.siteName,
+      author: localContent.author,
+      books,
     },
-    report,
+    report: {
+      updatedBook: updatedBook.title || TDGLTE_SLUG,
+      preservedBookCount: currentBooks.length - 1,
+      preservedChapterCount: Array.isArray(currentBook.chapters) ? currentBook.chapters.length : 0,
+      preservedLoreCount: Array.isArray(currentBook.lore) ? currentBook.lore.length : 0,
+      preservedFutureTitleCount: Array.isArray(currentBook.futureTitles) ? currentBook.futureTitles.length : 0,
+    },
   };
 }
 
@@ -165,7 +141,7 @@ async function main() {
       throw new Error("The existing 'site-content' record has no valid value object. No changes were made.");
     }
 
-    const { content: mergedContent, report } = mergeContentPreservingChapters(
+    const { content: mergedContent, report } = mergeContentMetadata(
       localContent,
       existingDocument.value,
     );
@@ -175,19 +151,15 @@ async function main() {
     console.log(`Database: ${databaseName || '(MongoDB default database)'}`);
     console.log(`Existing site-content record: found (${existingDocument._id})`);
     console.log(`Local books: ${localContent.books.length}`);
-    console.log(`Books retained from database but absent locally: ${report.preservedDatabaseOnlyBooks.length}`);
-    console.log(`Books whose existing chapter arrays will be preserved: ${report.preservedChapterCounts.length}`);
-
-    for (const item of report.preservedChapterCounts) {
-      console.log(`  - ${item.book}: preserving all ${item.databaseCount} database chapters; local chapters available but not applied: ${item.localCount}`);
-    }
-    for (const book of report.preservedDatabaseOnlyBooks) {
-      console.log(`  - Retaining database-only book: ${book}`);
-    }
+    console.log(`Metadata target: ${report.updatedBook}`);
+    console.log(`Other existing books preserved: ${report.preservedBookCount}`);
+    console.log(`Existing TDGLTE chapters preserved exactly: ${report.preservedChapterCount}`);
+    console.log(`Existing TDGLTE lore entries preserved: ${report.preservedLoreCount}`);
+    console.log(`Existing TDGLTE future-title entries preserved: ${report.preservedFutureTitleCount}`);
 
     const unchanged = JSON.stringify(existingDocument.value) === JSON.stringify(mergedContent);
     console.log(`Content differs from proposed merged version: ${!unchanged}`);
-    console.log('Existing chapter arrays for books with database chapters will not be modified. Other collections (comments, likes, reports, messages, characters) will not be modified.');
+    console.log('Only siteName, author, and selected TDGLTE book metadata fields are candidates for change. Chapters, lore, future titles, all other books, and other collections will not be modified.');
 
     if (!applyChanges) {
       console.log('No database changes made. Review this report, then rerun with --apply to proceed.');
@@ -223,7 +195,7 @@ async function main() {
 
     console.log('Content sync completed.');
     console.log(`Backup saved in content_backups with ID: ${backup.insertedId}`);
-    console.log('Only the site-content document was updated. Existing chapter arrays and user engagement collections were left untouched.');
+    console.log('Only siteName, author, and selected TDGLTE book metadata fields were updated in the site-content document. Chapters, lore, future titles, other books, and user engagement collections were left untouched.');
   } finally {
     await client.close();
   }
