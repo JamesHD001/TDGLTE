@@ -56,7 +56,8 @@ function validateLocalContent(content) {
   }
   if (book.chapters.some((chapter) =>
     !chapter || typeof chapter !== 'object' ||
-    (!Number.isFinite(Number(chapter.number)) && typeof chapter.slug !== 'string') ||
+    (!(typeof chapter.number === 'number' && Number.isFinite(chapter.number)) &&
+      !(typeof chapter.slug === 'string' && chapter.slug.trim())) ||
     typeof chapter.title !== 'string' ||
     !Array.isArray(chapter.paragraphs)
   )) {
