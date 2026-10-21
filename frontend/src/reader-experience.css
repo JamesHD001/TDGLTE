@@ -203,7 +203,7 @@
 .reader-experience .story-section li,
 .reader-experience .story-section blockquote {
   color: var(--reader-text);
-  font-size: 1rem;
+  font-size: inherit;
   line-height: 1.85;
   overflow-wrap: anywhere;
 }
@@ -245,9 +245,10 @@
   text-transform: uppercase;
 }
 
-.reader-experience .chapter-summary,
+ .reader-experience .chapter-summary,
 .reader-experience .chapter-summary p {
   color: var(--reader-muted);
+  font-size: inherit;
 }
 
 .reader-experience .chapter-sidebar {
