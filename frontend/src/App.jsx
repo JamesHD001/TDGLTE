@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { mysticPenHDContent } from './data/novelData';
 import './App.css';
+import './reader-experience.css';
+import ReaderToolbar from './components/ReaderToolbar';
 import './app-messages.css';
 import { apiUrl } from './lib/api';
 import { RichTextContent } from './lib/richText';
@@ -896,21 +898,108 @@ function ChapterEngagement({ bookSlug, chapterSlug }) {
 function StoryReaderPage({ book, loading, error }) {
   const { chapterSlug } = useParams();
   const location = useLocation();
-
+  const navigate = useNavigate();
   const chapters = Array.isArray(book?.chapters) ? book.chapters : [];
   const selectedChapter =
     chapters.find((chapter) => chapter.slug === chapterSlug) ?? chapters[0];
 
+  const [readerPreferences, setReaderPreferences] = useState(() => {
+    const defaults = { theme: 'dark', fontSize: 'medium', lineHeight: 'comfortable' };
+    try {
+      const saved = window.localStorage.getItem('mysticpenhd-reader-preferences');
+      return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
+    } catch {
+      return defaults;
+    }
+  });
+  const [chapterListOpen, setChapterListOpen] = useState(false);
+  const [readingProgress, setReadingProgress] = useState(0);
+
+  const updateReaderPreference = (key, value) => {
+    setReaderPreferences((current) => {
+      const next = { ...current, [key]: value };
+      try {
+        window.localStorage.setItem('mysticpenhd-reader-preferences', JSON.stringify(next));
+      } catch {
+        // Reader preferences remain usable for this session if storage is unavailable.
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
-    if (!location.hash) {
-      return;
+    if (!location.hash) return;
+    const target = document.getElementById(location.hash.replace('#', ''));
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [location.hash, selectedChapter?.slug]);
+
+  useEffect(() => {
+    if (loading || !chapters.length || chapterSlug) return;
+    try {
+      const lastChapter = window.localStorage.getItem('mysticpenhd-last-chapter');
+      if (lastChapter && chapters.some((chapter) => chapter.slug === lastChapter)) {
+        navigate(`/story-reader/${lastChapter}`, { replace: true });
+      }
+    } catch {
+      // Continue with the first chapter if local storage is unavailable.
+    }
+  }, [chapterSlug, chapters, loading, navigate]);
+
+  useEffect(() => {
+    if (!chapterSlug) return;
+    try {
+      window.localStorage.setItem('mysticpenhd-last-chapter', chapterSlug);
+    } catch {
+      // Remembering the last chapter is optional.
+    }
+  }, [chapterSlug]);
+
+  useEffect(() => {
+    if (!selectedChapter?.slug) return undefined;
+    const progressKey = `mysticpenhd-reader-progress:${selectedChapter.slug}`;
+
+    let restoreFrame;
+    try {
+      const savedProgress = Number(window.localStorage.getItem(progressKey) || 0);
+      if (savedProgress > 0 && savedProgress <= 100) {
+        restoreFrame = window.requestAnimationFrame(() => {
+          const article = document.getElementById(selectedChapter.slug);
+          if (!article) return;
+          const chapterTop = article.getBoundingClientRect().top + window.scrollY;
+          const scrollableChapterHeight = Math.max(0, article.offsetHeight - window.innerHeight);
+          window.scrollTo({
+            top: chapterTop + (scrollableChapterHeight * savedProgress) / 100,
+            behavior: 'auto',
+          });
+        });
+      }
+    } catch {
+      // Reading position is optional and should never block the chapter.
     }
 
-    const target = document.getElementById(location.hash.replace('#', ''));
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, [location.hash, selectedChapter?.slug]);
+    const updateProgress = () => {
+      const article = document.getElementById(selectedChapter.slug);
+      if (!article) return;
+      const chapterTop = article.getBoundingClientRect().top + window.scrollY;
+      const scrollableChapterHeight = Math.max(1, article.offsetHeight - window.innerHeight);
+      const nextProgress = Math.round(
+        Math.min(100, Math.max(0, ((window.scrollY - chapterTop) / scrollableChapterHeight) * 100)),
+      );
+      setReadingProgress(nextProgress);
+      try {
+        window.localStorage.setItem(progressKey, String(nextProgress));
+      } catch {
+        // Progress remains visible even if storage is unavailable.
+      }
+    };
+
+    window.addEventListener('scroll', updateProgress, { passive: true });
+    updateProgress();
+    return () => {
+      if (restoreFrame !== undefined) window.cancelAnimationFrame(restoreFrame);
+      window.removeEventListener('scroll', updateProgress);
+    };
+  }, [selectedChapter?.slug]);
 
   if (loading) {
     return (
@@ -948,9 +1037,14 @@ function StoryReaderPage({ book, loading, error }) {
         title={`${selectedChapter.title || 'Chapter'} — ${book.title}`}
         description={selectedChapter.summary || `Read ${selectedChapter.title} in ${book.title}`}
       />
-      <main className="reader-page">
+      <main
+        className={`reader-page reader-experience reader-theme-${readerPreferences.theme} reader-font-${readerPreferences.fontSize} reader-leading-${readerPreferences.lineHeight}`}
+      >
         <div className="container reading-shell reader-layout">
-          <aside className="chapter-sidebar" aria-label="Chapter navigation">
+          <aside
+            className={chapterListOpen ? 'chapter-sidebar is-open' : 'chapter-sidebar'}
+            aria-label="Chapter navigation"
+          >
             <p className="eyebrow">Chapters</p>
             <nav>
               {chapters.map((chapter) => (
@@ -958,6 +1052,8 @@ function StoryReaderPage({ book, loading, error }) {
                   key={chapter.slug}
                   to={`/story-reader/${chapter.slug}#${chapter.slug}`}
                   className={chapter.slug === selectedChapter.slug ? 'chapter-link active' : 'chapter-link'}
+                  aria-current={chapter.slug === selectedChapter.slug ? 'page' : undefined}
+                  onClick={() => setChapterListOpen(false)}
                 >
                   <span>{chapter.label}</span>
                   <strong>{chapter.title}</strong>
@@ -967,9 +1063,18 @@ function StoryReaderPage({ book, loading, error }) {
           </aside>
 
           <div className="reader-column">
+            <ReaderToolbar
+              preferences={readerPreferences}
+              onPreferenceChange={updateReaderPreference}
+              chapterListOpen={chapterListOpen}
+              onToggleChapterList={() => setChapterListOpen((open) => !open)}
+              progress={readingProgress}
+            />
+
             <header className="reader-header">
               <p className="eyebrow">{book.title}</p>
-              <h1>Read the Story</h1>
+              <h1>Reading Room</h1>
+              <p className="reader-summary">Take your time. Your reading preferences and chapter progress are saved on this device.</p>
             </header>
 
             <div className="reading-content">
