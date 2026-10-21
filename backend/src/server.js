@@ -1456,27 +1456,34 @@ app.get('/api/messages/stream', requireAuthentication, requireAdmin, async (requ
 // Initialize persistence once. This is used by both the local server and Vercel handler.
 let initializationPromise = null;
 
+
 export function initializeApplication() {
   if (!initializationPromise) {
     initializationPromise = (async () => {
+      if (!process.env.MONGODB_URI && !process.env.DATABASE_URL) {
+        throw new Error(
+          'MongoDB connection is required. Set MONGODB_URI or DATABASE_URL.'
+        );
+      }
 
-      if (process.env.MONGODB_URI || process.env.DATABASE_URL) {
-        try {
-          await initDb();
-          usingDb = true;
-          console.log('MongoDB connected successfully: using MongoDB for persistence');
-        } catch (dbError) {
-          usingDb = false;
-          console.warn('MongoDB connection failed — falling back to local file-based persistence.');
-          console.warn(`[MongoDB Notice] ${dbError.message}`);
-        }
-      } else {
+      try {
+        await initDb();
+        usingDb = true;
+        console.log(
+          'MongoDB connected successfully: using MongoDB for persistence'
+        );
+      } catch (dbError) {
         usingDb = false;
-        console.log('No DATABASE_URL found — using file-based persistence');
+        console.error(
+          'MongoDB initialization failed. Refusing to start without database persistence.'
+        );
+        throw dbError;
       }
     })();
   }
+
   return initializationPromise;
 }
+
 
 export default app;
