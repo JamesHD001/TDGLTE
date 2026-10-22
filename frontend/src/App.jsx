@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { mysticPenHDContent } from './data/novelData';
 import './App.css';
+import './reader-experience.css';
+import ReaderToolbar from './components/ReaderToolbar';
 import './app-messages.css';
 import { apiUrl } from './lib/api';
 import { RichTextContent } from './lib/richText';
@@ -114,6 +116,9 @@ function ScrollToTop() {
   const location = useLocation();
 
   useEffect(() => {
+    // The reader manages its own chapter/hash scrolling. A global scroll-to-top
+    // here can override the chapter anchor and make progress appear stuck.
+    if (location.pathname.startsWith('/story-reader')) return;
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [location.pathname]);
 
@@ -896,21 +901,127 @@ function ChapterEngagement({ bookSlug, chapterSlug }) {
 function StoryReaderPage({ book, loading, error }) {
   const { chapterSlug } = useParams();
   const location = useLocation();
-
+  const navigate = useNavigate();
   const chapters = Array.isArray(book?.chapters) ? book.chapters : [];
   const selectedChapter =
     chapters.find((chapter) => chapter.slug === chapterSlug) ?? chapters[0];
 
+  const [readerPreferences, setReaderPreferences] = useState(() => {
+    const defaults = { theme: 'dark', fontSize: 'medium', lineHeight: 'comfortable' };
+    try {
+      const saved = window.localStorage.getItem('mysticpenhd-reader-preferences');
+      return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
+    } catch {
+      return defaults;
+    }
+  });
+  const [chapterListOpen, setChapterListOpen] = useState(false);
+  const [readingProgress, setReadingProgress] = useState(0);
+
+  const updateReaderPreference = (key, value) => {
+    setReaderPreferences((current) => {
+      const next = { ...current, [key]: value };
+      try {
+        window.localStorage.setItem('mysticpenhd-reader-preferences', JSON.stringify(next));
+      } catch {
+        // Reader preferences remain usable for this session if storage is unavailable.
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
-    if (!location.hash) {
-      return;
+    if (!location.hash) return undefined;
+    let frame;
+    frame = window.requestAnimationFrame(() => {
+      const target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      if (target) target.scrollIntoView({ behavior: 'auto', block: 'start' });
+    });
+    return () => {
+      if (frame !== undefined) window.cancelAnimationFrame(frame);
+    };
+  }, [location.hash, selectedChapter?.slug]);
+
+  useEffect(() => {
+    if (loading || !chapters.length || chapterSlug) return;
+    try {
+      const lastChapter = window.localStorage.getItem(`mysticpenhd-last-chapter:${book?.slug || 'default'}`);
+      if (lastChapter && chapters.some((chapter) => chapter.slug === lastChapter)) {
+        navigate(`/story-reader/${lastChapter}`, { replace: true });
+      }
+    } catch {
+      // Continue with the first chapter if local storage is unavailable.
+    }
+  }, [book?.slug, chapterSlug, chapters, loading, navigate]);
+
+  useEffect(() => {
+    if (!chapterSlug) return;
+    try {
+      window.localStorage.setItem(`mysticpenhd-last-chapter:${book?.slug || 'default'}`, chapterSlug);
+    } catch {
+      // Remembering the last chapter is optional.
+    }
+  }, [book?.slug, chapterSlug]);
+
+  useEffect(() => {
+    if (!selectedChapter?.slug) return undefined;
+    const progressKey = `mysticpenhd-reader-progress:${book?.slug || 'default'}:${selectedChapter.slug}`;
+
+    let restoreFrame;
+    let savedProgress = 0;
+    try {
+      savedProgress = Number(window.localStorage.getItem(progressKey) || 0);
+    } catch {
+      // Reading position is optional and should never block the chapter.
     }
 
-    const target = document.getElementById(location.hash.replace('#', ''));
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const updateProgress = () => {
+      const article = document.getElementById(selectedChapter.slug);
+      if (!article) return;
+
+      const articleBounds = article.getBoundingClientRect();
+      const articleTop = articleBounds.top + window.scrollY;
+      const articleBottom = articleTop + articleBounds.height;
+      const maxScrollWithinChapter = Math.max(1, articleBottom - articleTop - window.innerHeight);
+      const scrollWithinChapter = window.scrollY - articleTop;
+      const nextProgress = Math.round(
+        Math.min(100, Math.max(0, (scrollWithinChapter / maxScrollWithinChapter) * 100)),
+      );
+
+      setReadingProgress(nextProgress);
+      try {
+        window.localStorage.setItem(progressKey, String(nextProgress));
+      } catch {
+        // Progress remains visible even if storage is unavailable.
+      }
+    };
+
+    if (!location.hash && savedProgress > 0 && savedProgress <= 100) {
+      restoreFrame = window.requestAnimationFrame(() => {
+        const article = document.getElementById(selectedChapter.slug);
+        if (!article) return;
+        const chapterTop = article.getBoundingClientRect().top + window.scrollY;
+        const scrollableChapterHeight = Math.max(0, article.offsetHeight - window.innerHeight);
+        window.scrollTo({
+          top: chapterTop + (scrollableChapterHeight * savedProgress) / 100,
+          behavior: 'auto',
+        });
+        updateProgress();
+      });
+    } else {
+      updateProgress();
     }
-  }, [location.hash, selectedChapter?.slug]);
+
+    const initialProgressFrame = window.requestAnimationFrame(updateProgress);
+    window.addEventListener('scroll', updateProgress, { passive: true });
+    window.addEventListener('resize', updateProgress);
+    return () => {
+      if (restoreFrame !== undefined) window.cancelAnimationFrame(restoreFrame);
+      window.cancelAnimationFrame(initialProgressFrame);
+      window.removeEventListener('scroll', updateProgress);
+      window.removeEventListener('resize', updateProgress);
+    };
+  }, [book?.slug, location.hash, selectedChapter?.slug]);
 
   if (loading) {
     return (
@@ -948,9 +1059,15 @@ function StoryReaderPage({ book, loading, error }) {
         title={`${selectedChapter.title || 'Chapter'} — ${book.title}`}
         description={selectedChapter.summary || `Read ${selectedChapter.title} in ${book.title}`}
       />
-      <main className="reader-page">
+      <main
+        className={`reader-page reader-experience reader-theme-${readerPreferences.theme} reader-font-${readerPreferences.fontSize} reader-leading-${readerPreferences.lineHeight}`}
+      >
         <div className="container reading-shell reader-layout">
-          <aside className="chapter-sidebar" aria-label="Chapter navigation">
+          <aside
+            id="reader-chapter-list"
+            className={chapterListOpen ? 'chapter-sidebar is-open' : 'chapter-sidebar'}
+            aria-label="Chapter navigation"
+          >
             <p className="eyebrow">Chapters</p>
             <nav>
               {chapters.map((chapter) => (
@@ -958,6 +1075,8 @@ function StoryReaderPage({ book, loading, error }) {
                   key={chapter.slug}
                   to={`/story-reader/${chapter.slug}#${chapter.slug}`}
                   className={chapter.slug === selectedChapter.slug ? 'chapter-link active' : 'chapter-link'}
+                  aria-current={chapter.slug === selectedChapter.slug ? 'page' : undefined}
+                  onClick={() => setChapterListOpen(false)}
                 >
                   <span>{chapter.label}</span>
                   <strong>{chapter.title}</strong>
@@ -967,9 +1086,18 @@ function StoryReaderPage({ book, loading, error }) {
           </aside>
 
           <div className="reader-column">
+            <ReaderToolbar
+              preferences={readerPreferences}
+              onPreferenceChange={updateReaderPreference}
+              chapterListOpen={chapterListOpen}
+              onToggleChapterList={() => setChapterListOpen((open) => !open)}
+              progress={readingProgress}
+            />
+
             <header className="reader-header">
               <p className="eyebrow">{book.title}</p>
-              <h1>Read the Story</h1>
+              <h1>Reading Room</h1>
+              <p className="reader-summary">Take your time. Your reading preferences and chapter progress are saved on this device.</p>
             </header>
 
             <div className="reading-content">
