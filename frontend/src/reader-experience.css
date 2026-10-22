@@ -148,6 +148,18 @@
   margin-top: 1rem;
 }
 
+.reader-progress-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: 0 0 1.25rem;
+  padding: 0.7rem 0.9rem 0.75rem;
+  border: 1px solid var(--reader-border);
+  border-radius: 0 0 0.85rem 0.85rem;
+  background: var(--reader-surface-raised);
+  box-shadow: 0 0.45rem 1.2rem rgba(0, 0, 0, 0.12);
+}
+
 .reader-progress-copy {
   margin-bottom: 0.45rem;
   font-size: 0.75rem;
