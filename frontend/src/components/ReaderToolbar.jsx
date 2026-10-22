@@ -90,20 +90,20 @@ export default function ReaderToolbar({
         </label>
       </div>
 
-      <div className="reader-progress" aria-label="Chapter reading progress">
-        <div className="reader-progress-copy">
-          <span>Chapter progress</span>
-          <span>{progress}%</span>
-        </div>
-        <progress
-          className="reader-progress-track"
-          aria-label="Current chapter reading progress"
-          value={progress}
-          max="100"
-        >
-          {progress}%
-        </progress>
-      </div>
     </section>
+    <div className="reader-progress reader-progress-sticky" aria-label="Chapter reading progress">
+      <div className="reader-progress-copy">
+        <span>Chapter progress</span>
+        <span>{progress}%</span>
+      </div>
+      <progress
+        className="reader-progress-track"
+        aria-label="Current chapter reading progress"
+        value={progress}
+        max="100"
+      >
+        {progress}%
+      </progress>
+    </div>
   );
 }
