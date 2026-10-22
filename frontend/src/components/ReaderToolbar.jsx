@@ -26,7 +26,8 @@ export default function ReaderToolbar({
   progress,
 }) {
   return (
-    <section className="reader-tools" aria-label="Reading preferences">
+    <>
+      <section className="reader-tools" aria-label="Reading preferences">
       <div className="reader-tools-topline">
         <p className="reader-tools-label">Reading tools</p>
         <button
@@ -105,5 +106,6 @@ export default function ReaderToolbar({
         {progress}%
       </progress>
     </div>
+    </>
   );
 }
