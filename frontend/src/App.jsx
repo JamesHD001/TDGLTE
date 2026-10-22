@@ -116,6 +116,9 @@ function ScrollToTop() {
   const location = useLocation();
 
   useEffect(() => {
+    // The reader manages its own chapter/hash scrolling. A global scroll-to-top
+    // here can override the chapter anchor and make progress appear stuck.
+    if (location.pathname.startsWith('/story-reader')) return;
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [location.pathname]);
 
@@ -928,9 +931,15 @@ function StoryReaderPage({ book, loading, error }) {
   };
 
   useEffect(() => {
-    if (!location.hash) return;
-    const target = document.getElementById(location.hash.slice(1));
-    if (target) target.scrollIntoView({ behavior: 'auto', block: 'start' });
+    if (!location.hash) return undefined;
+    let frame;
+    frame = window.requestAnimationFrame(() => {
+      const target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      if (target) target.scrollIntoView({ behavior: 'auto', block: 'start' });
+    });
+    return () => {
+      if (frame !== undefined) window.cancelAnimationFrame(frame);
+    };
   }, [location.hash, selectedChapter?.slug]);
 
   useEffect(() => {
@@ -969,11 +978,16 @@ function StoryReaderPage({ book, loading, error }) {
     const updateProgress = () => {
       const article = document.getElementById(selectedChapter.slug);
       if (!article) return;
-      const chapterTop = article.getBoundingClientRect().top + window.scrollY;
-      const scrollableChapterHeight = Math.max(1, article.offsetHeight - window.innerHeight);
+
+      const articleBounds = article.getBoundingClientRect();
+      const articleTop = articleBounds.top + window.scrollY;
+      const articleBottom = articleTop + articleBounds.height;
+      const maxScrollWithinChapter = Math.max(1, articleBottom - articleTop - window.innerHeight);
+      const scrollWithinChapter = window.scrollY - articleTop;
       const nextProgress = Math.round(
-        Math.min(100, Math.max(0, ((window.scrollY - chapterTop) / scrollableChapterHeight) * 100)),
+        Math.min(100, Math.max(0, (scrollWithinChapter / maxScrollWithinChapter) * 100)),
       );
+
       setReadingProgress(nextProgress);
       try {
         window.localStorage.setItem(progressKey, String(nextProgress));
@@ -998,10 +1012,14 @@ function StoryReaderPage({ book, loading, error }) {
       updateProgress();
     }
 
+    const initialProgressFrame = window.requestAnimationFrame(updateProgress);
     window.addEventListener('scroll', updateProgress, { passive: true });
+    window.addEventListener('resize', updateProgress);
     return () => {
       if (restoreFrame !== undefined) window.cancelAnimationFrame(restoreFrame);
+      window.cancelAnimationFrame(initialProgressFrame);
       window.removeEventListener('scroll', updateProgress);
+      window.removeEventListener('resize', updateProgress);
     };
   }, [book?.slug, location.hash, selectedChapter?.slug]);
 
